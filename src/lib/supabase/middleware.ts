@@ -58,5 +58,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Already authenticated users shouldn't see the login form — bounce them to
+  // the app (honoring ?redirectTo if present).
+  if (user && pathname === "/login") {
+    const url = request.nextUrl.clone();
+    const redirectTo = url.searchParams.get("redirectTo");
+    url.pathname = redirectTo?.startsWith("/") ? redirectTo : "/matches";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }
