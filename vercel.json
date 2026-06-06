@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync-results?secret=2a592941-7f7d-4c49-a4a6-800542476b4a",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
