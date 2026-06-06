@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/admin-guard";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface AdminActionResult {
   ok: boolean;
@@ -12,8 +12,15 @@ export interface AdminActionResult {
 
 /**
  * Create a new match (fixture). Admin-only.
- * Writes go through the admin's RLS session — the DB restricts inserts to
- * is_admin profiles, and we also guard here for a clear error message.
+ *
+ * Authorization is enforced HERE by requireAdmin() (which reads
+ * profiles.is_admin server-side); the actual write then goes through the
+ * service-role client, mirroring the sync routes. We deliberately do NOT use
+ * the authenticated SSR client for these writes: the matches RLS policy calls
+ * a SQL function `is_admin()` that lacks EXECUTE for the `authenticated` role,
+ * so policy-checked writes fail with 42501 "permission denied for function
+ * is_admin". Using the service role (already gated by requireAdmin) is safe and
+ * unblocks admin match management without a DB migration. See task #7.
  */
 export async function createMatch(
   _prev: AdminActionResult | null,
@@ -45,7 +52,7 @@ export async function createMatch(
     return { ok: false, error: "Invalid kickoff time." };
   }
 
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("matches").insert({
     home_team: homeTeam,
     away_team: awayTeam,
@@ -66,6 +73,10 @@ export async function createMatch(
 /**
  * Finalize a match result. Sets home/away score and status='finished', which
  * fires the DB `score_match_predictions` trigger to award points.
+ *
+ * Same authorization model as createMatch: requireAdmin() gates the call, then
+ * the write uses the service-role client (avoids the matches RLS is_admin()
+ * EXECUTE-grant gap). The scoring trigger runs regardless of which role writes.
  */
 export async function finalizeMatch(
   _prev: AdminActionResult | null,
@@ -98,7 +109,7 @@ export async function finalizeMatch(
     return { ok: false, error: "Scores must be non-negative whole numbers." };
   }
 
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("matches")
     .update({
