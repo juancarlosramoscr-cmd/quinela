@@ -99,68 +99,134 @@ export default async function LeaderboardPage() {
           No predictions scored yet. Once matches finish, points appear here.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3 font-semibold">#</th>
-                <th className="px-4 py-3 font-semibold">Player</th>
-                <th className="px-4 py-3 text-right font-semibold">Points</th>
-                <th className="px-4 py-3 text-right font-semibold">
-                  <span title="Exact-score predictions (3 pts each)">
-                    Exact
-                  </span>
-                </th>
-                <th className="px-4 py-3 text-right font-semibold">
-                  <span title="Correct-outcome-only predictions (1 pt each)">
-                    Outcome
-                  </span>
-                </th>
-                <th className="px-4 py-3 text-right font-semibold">Predictions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const isCurrentUser = user?.id === row.user_id;
-                return (
-                  <tr
-                    key={row.user_id}
-                    className={`border-b border-slate-100 last:border-0 ${
-                      isCurrentUser
-                        ? "bg-amber-50 font-medium"
-                        : "hover:bg-slate-50"
-                    }`}
-                  >
-                    <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">
-                      <span className="mr-1">{rankBadge(row.rank)}</span>
-                      {row.rank}
-                    </td>
-                    <td className="px-4 py-3 text-slate-900">
-                      {row.display_name}
+        <>
+          {/* Mobile (< sm): stacked cards — no horizontal clipping, every stat
+              is visible without scrolling. */}
+          <ul className="space-y-2 sm:hidden">
+            {rows.map((row) => {
+              const isCurrentUser = user?.id === row.user_id;
+              return (
+                <li
+                  key={row.user_id}
+                  className={`rounded-lg border p-3 ${
+                    isCurrentUser
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 tabular-nums text-slate-700">
+                        {rankBadge(row.rank)}
+                        {row.rank}
+                      </span>
+                      <span className="truncate font-medium text-slate-900">
+                        {row.display_name}
+                      </span>
                       {isCurrentUser && (
-                        <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                        <span className="shrink-0 rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
                           You
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
-                      {row.total_points}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">
-                      {row.exact_count}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">
-                      {row.winner_count}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">
-                      {row.predictions_made}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <span className="shrink-0 text-right">
+                      <span className="text-lg font-bold tabular-nums text-slate-900">
+                        {row.total_points}
+                      </span>
+                      <span className="ml-1 text-xs text-slate-500">pts</span>
+                    </span>
+                  </div>
+                  <dl className="mt-2 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2 text-center text-xs">
+                    <div>
+                      <dt className="text-slate-500">Exact</dt>
+                      <dd className="font-semibold tabular-nums text-slate-700">
+                        {row.exact_count}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Outcome</dt>
+                      <dd className="font-semibold tabular-nums text-slate-700">
+                        {row.winner_count}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Predictions</dt>
+                      <dd className="font-semibold tabular-nums text-slate-700">
+                        {row.predictions_made}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* sm and up: full table. */}
+          <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 font-semibold">#</th>
+                  <th className="px-4 py-3 font-semibold">Player</th>
+                  <th className="px-4 py-3 text-right font-semibold">Points</th>
+                  <th className="px-4 py-3 text-right font-semibold">
+                    <span title="Exact-score predictions (3 pts each)">
+                      Exact
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">
+                    <span title="Correct-outcome-only predictions (1 pt each)">
+                      Outcome
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">
+                    Predictions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const isCurrentUser = user?.id === row.user_id;
+                  return (
+                    <tr
+                      key={row.user_id}
+                      className={`border-b border-slate-100 last:border-0 ${
+                        isCurrentUser
+                          ? "bg-amber-50 font-medium"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">
+                        <span className="mr-1">{rankBadge(row.rank)}</span>
+                        {row.rank}
+                      </td>
+                      <td className="px-4 py-3 text-slate-900">
+                        {row.display_name}
+                        {isCurrentUser && (
+                          <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                            You
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
+                        {row.total_points}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {row.exact_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {row.winner_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {row.predictions_made}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
