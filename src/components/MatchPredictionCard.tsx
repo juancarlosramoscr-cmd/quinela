@@ -6,11 +6,11 @@ import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatCountdown,
-  isLocked,
+  isMatchLocked,
   lockAt,
   msUntilLock,
-} from "@/lib/predictions/lock";
-import type { Match, Prediction } from "@/lib/predictions/types";
+} from "@/lib/lock";
+import type { Match, Prediction } from "@/lib/database.types";
 
 interface Props {
   match: Match;
@@ -47,14 +47,15 @@ export default function MatchPredictionCard({
     return () => clearInterval(id);
   }, []);
 
-  const locked = useMemo(() => isLocked(match, now), [match, now]);
+  const nowMs = now.getTime();
+  const locked = useMemo(() => isMatchLocked(match, nowMs), [match, nowMs]);
   const remainingMs = useMemo(
-    () => msUntilLock(match.kickoff_at, now),
-    [match.kickoff_at, now],
+    () => msUntilLock(match, nowMs),
+    [match, nowMs],
   );
 
   const kickoff = useMemo(() => new Date(match.kickoff_at), [match.kickoff_at]);
-  const lockMoment = useMemo(() => lockAt(match.kickoff_at), [match.kickoff_at]);
+  const lockMoment = useMemo(() => lockAt(match), [match]);
 
   const supabase = useMemo(() => createClient(), []);
 
