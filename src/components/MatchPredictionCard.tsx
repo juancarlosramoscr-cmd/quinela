@@ -39,6 +39,11 @@ export default function MatchPredictionCard({
   );
   const [saved, setSaved] = useState<Prediction | null>(prediction);
   const [save, setSave] = useState<SaveState>({ status: "idle" });
+  // Set when the SERVER rejects a save because the match is locked. Guards
+  // against client/server clock skew at the deadline: even if our local clock
+  // still thinks the match is open, a server lock rejection flips the card to
+  // read-only immediately so the user can't keep retrying a doomed edit.
+  const [serverLocked, setServerLocked] = useState(false);
 
   // Live clock: recompute lock state + countdown every second.
   const [now, setNow] = useState<Date>(() => new Date());
@@ -48,7 +53,10 @@ export default function MatchPredictionCard({
   }, []);
 
   const nowMs = now.getTime();
-  const locked = useMemo(() => isMatchLocked(match, nowMs), [match, nowMs]);
+  const locked = useMemo(
+    () => serverLocked || isMatchLocked(match, nowMs),
+    [serverLocked, match, nowMs],
+  );
   const remainingMs = useMemo(
     () => msUntilLock(match, nowMs),
     [match, nowMs],
@@ -96,6 +104,13 @@ export default function MatchPredictionCard({
       .single();
 
     if (error) {
+      // If the server rejected because the match locked (deadline race),
+      // flip the card to read-only immediately — don't wait for the local
+      // clock to agree.
+      if (isLockError(error.message)) {
+        setServerLocked(true);
+        // Preserve what the user typed as their (un-saved) read-only view.
+      }
       setSave({
         status: "error",
         message: friendlyError(error.message),
@@ -265,6 +280,11 @@ function ReadOnlyPrediction({ prediction }: { prediction: Prediction | null }) {
       </div>
     </div>
   );
+}
+
+/** Whether a server error indicates the prediction lock rejected the write. */
+function isLockError(message: string): boolean {
+  return message.toLowerCase().includes("lock");
 }
 
 /** Turn raw Postgres/RLS errors into something a user can act on. */
