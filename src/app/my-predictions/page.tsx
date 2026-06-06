@@ -69,7 +69,10 @@ export default async function MyPredictionsPage() {
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
           You haven&apos;t made any predictions yet.{" "}
-          <Link href="/matches" className="font-medium text-blue-600 underline">
+          <Link
+            href="/matches"
+            className="font-medium text-slate-900 underline underline-offset-2 hover:text-slate-700"
+          >
             Pick some matches →
           </Link>
         </p>

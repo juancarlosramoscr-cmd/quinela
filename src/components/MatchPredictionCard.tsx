@@ -134,14 +134,14 @@ export default function MatchPredictionCard({
   }, [home, away, supabase, userId, match.id]);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       {/* Header: teams + stage */}
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
           {match.stage ?? "Match"}
         </div>
         {locked ? (
-          <span className="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
+          <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700">
             {isFinished ? "Finished" : "Locked"}
           </span>
         ) : (
@@ -152,11 +152,11 @@ export default function MatchPredictionCard({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <span className="flex-1 text-right text-sm font-semibold text-gray-900">
+        <span className="flex-1 text-right text-sm font-semibold text-slate-900">
           {match.home_team}
         </span>
-        <span className="text-xs text-gray-400">vs</span>
-        <span className="flex-1 text-left text-sm font-semibold text-gray-900">
+        <span className="text-xs text-slate-400">vs</span>
+        <span className="flex-1 text-left text-sm font-semibold text-slate-900">
           {match.away_team}
         </span>
       </div>
@@ -165,7 +165,7 @@ export default function MatchPredictionCard({
           formats in the runtime's timezone — server (UTC) and client (local)
           can differ, which would be a hydration mismatch. `suppressHydrationWarning`
           covers the unavoidable server→client text swap on this node. */}
-      <div className="mt-1 text-center text-xs text-gray-500">
+      <div className="mt-1 text-center text-xs text-slate-500">
         <time dateTime={match.kickoff_at} suppressHydrationWarning>
           {mounted ? format(kickoff, "EEE d MMM, HH:mm") : ""}
         </time>
@@ -175,7 +175,7 @@ export default function MatchPredictionCard({
       {isFinished &&
         match.home_score !== null &&
         match.away_score !== null && (
-          <div className="mt-2 text-center text-sm font-bold text-gray-900">
+          <div className="mt-2 text-center text-sm font-bold text-slate-900">
             Full time {match.home_score} – {match.away_score}
           </div>
         )}
@@ -186,18 +186,20 @@ export default function MatchPredictionCard({
           <ReadOnlyPrediction prediction={saved} />
         ) : (
           <>
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-end justify-center gap-2">
               <ScoreInput
                 label={`${match.home_team} score`}
+                hint="Home"
                 value={home}
                 onChange={(v) => {
                   setHome(v);
                   setSave({ status: "idle" });
                 }}
               />
-              <span className="text-lg font-bold text-gray-400">–</span>
+              <span className="pb-5 text-lg font-bold text-slate-400">–</span>
               <ScoreInput
                 label={`${match.away_team} score`}
+                hint="Away"
                 value={away}
                 onChange={(v) => {
                   setAway(v);
@@ -210,7 +212,7 @@ export default function MatchPredictionCard({
               type="button"
               onClick={onSave}
               disabled={save.status === "saving"}
-              className="mt-3 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {save.status === "saving"
                 ? "Saving…"
@@ -226,12 +228,12 @@ export default function MatchPredictionCard({
           mount so the server render and first client render are identical
           (no clock-derived text mismatch → no hydration warning). */}
       {!locked && (
-        <p className="mt-2 text-center text-xs text-gray-500">
+        <p className="mt-2 text-center text-xs text-slate-500">
           Locks in{" "}
-          <span className="font-mono font-semibold text-gray-700">
+          <span className="font-mono font-semibold text-slate-700">
             {mounted ? formatCountdown(remainingMs) : "—"}
           </span>{" "}
-          <span className="text-gray-400" suppressHydrationWarning>
+          <span className="text-slate-400" suppressHydrationWarning>
             {mounted ? `(at ${format(lockMoment, "HH:mm")})` : ""}
           </span>
         </p>
@@ -257,39 +259,48 @@ export default function MatchPredictionCard({
 
 function ScoreInput({
   label,
+  hint,
   value,
   onChange,
 }: {
   label: string;
+  /** Visible "Home"/"Away" microcopy so the two boxes aren't ambiguous. */
+  hint: string;
   value: string;
   onChange: (v: string) => void;
 }) {
   return (
-    <input
-      type="number"
-      inputMode="numeric"
-      min={0}
-      step={1}
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-14 rounded-md border border-gray-300 px-2 py-1.5 text-center text-lg font-semibold text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-    />
+    <div className="flex flex-col items-center gap-1">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        step={1}
+        placeholder="0"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-14 rounded-md border border-slate-300 px-2 py-1.5 text-center text-lg font-semibold text-slate-900 placeholder:text-slate-300 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+      />
+      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+        {hint}
+      </span>
+    </div>
   );
 }
 
 function ReadOnlyPrediction({ prediction }: { prediction: Prediction | null }) {
   if (!prediction) {
     return (
-      <p className="text-center text-sm italic text-gray-400">
+      <p className="text-center text-sm italic text-slate-400">
         No prediction made.
       </p>
     );
   }
   return (
     <div className="text-center">
-      <div className="text-xs text-gray-500">Your prediction</div>
-      <div className="text-lg font-bold text-gray-900">
+      <div className="text-xs text-slate-500">Your prediction</div>
+      <div className="text-lg font-bold text-slate-900">
         {prediction.home_score} – {prediction.away_score}
       </div>
     </div>
