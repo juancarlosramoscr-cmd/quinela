@@ -46,20 +46,31 @@ export default function MatchPredictionCard({
   const [serverLocked, setServerLocked] = useState(false);
 
   // Live clock: recompute lock state + countdown every second.
-  const [now, setNow] = useState<Date>(() => new Date());
+  // NOTE: `now` is intentionally null until the component mounts on the client.
+  // The server render and the first client render must be identical to avoid a
+  // hydration mismatch, so any clock-derived text (countdown, lock badge) is
+  // gated on `mounted` below and only becomes "live" after the first effect.
+  const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    setNow(new Date()); // first client tick
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const nowMs = now.getTime();
+  const mounted = now !== null;
+  const nowMs = now?.getTime() ?? 0;
+  const isFinished = match.status === "finished";
+  // `finished` is clock-independent, so it's safe to lock from it on the very
+  // first (server) render — no flicker, no hydration mismatch. The *time*-based
+  // lock (within 1h of kickoff) is only applied after mount, once we have the
+  // client clock; a server lock rejection (serverLocked) also forces locked.
   const locked = useMemo(
-    () => serverLocked || isMatchLocked(match, nowMs),
-    [serverLocked, match, nowMs],
+    () => serverLocked || isFinished || (mounted && isMatchLocked(match, nowMs)),
+    [serverLocked, isFinished, mounted, match, nowMs],
   );
   const remainingMs = useMemo(
-    () => msUntilLock(match, nowMs),
-    [match, nowMs],
+    () => (mounted ? msUntilLock(match, nowMs) : 0),
+    [mounted, match, nowMs],
   );
 
   const kickoff = useMemo(() => new Date(match.kickoff_at), [match.kickoff_at]);
@@ -122,8 +133,6 @@ export default function MatchPredictionCard({
     setSave({ status: "saved" });
   }, [home, away, supabase, userId, match.id]);
 
-  const isFinished = match.status === "finished";
-
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       {/* Header: teams + stage */}
@@ -152,10 +161,13 @@ export default function MatchPredictionCard({
         </span>
       </div>
 
-      {/* Kickoff time: local absolute */}
+      {/* Kickoff time: local absolute. Rendered after mount because date-fns
+          formats in the runtime's timezone — server (UTC) and client (local)
+          can differ, which would be a hydration mismatch. `suppressHydrationWarning`
+          covers the unavoidable server→client text swap on this node. */}
       <div className="mt-1 text-center text-xs text-gray-500">
-        <time dateTime={match.kickoff_at}>
-          {format(kickoff, "EEE d MMM, HH:mm")}
+        <time dateTime={match.kickoff_at} suppressHydrationWarning>
+          {mounted ? format(kickoff, "EEE d MMM, HH:mm") : ""}
         </time>
       </div>
 
@@ -210,15 +222,17 @@ export default function MatchPredictionCard({
         )}
       </div>
 
-      {/* Live countdown to lock */}
+      {/* Live countdown to lock. The dynamic figure is rendered only after
+          mount so the server render and first client render are identical
+          (no clock-derived text mismatch → no hydration warning). */}
       {!locked && (
         <p className="mt-2 text-center text-xs text-gray-500">
           Locks in{" "}
           <span className="font-mono font-semibold text-gray-700">
-            {formatCountdown(remainingMs)}
+            {mounted ? formatCountdown(remainingMs) : "—"}
           </span>{" "}
-          <span className="text-gray-400">
-            (at {format(lockMoment, "HH:mm")})
+          <span className="text-gray-400" suppressHydrationWarning>
+            {mounted ? `(at ${format(lockMoment, "HH:mm")})` : ""}
           </span>
         </p>
       )}
