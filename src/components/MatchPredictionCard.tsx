@@ -114,7 +114,7 @@ export default function MatchPredictionCard({
       {/* Header: teams + stage */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          {match.stage}
+          {match.stage ?? "Match"}
         </div>
         {locked ? (
           <span className="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
@@ -163,13 +163,19 @@ export default function MatchPredictionCard({
               <ScoreInput
                 label={`${match.home_team} score`}
                 value={home}
-                onChange={setHome}
+                onChange={(v) => {
+                  setHome(v);
+                  setSave({ status: "idle" });
+                }}
               />
               <span className="text-lg font-bold text-gray-400">–</span>
               <ScoreInput
                 label={`${match.away_team} score`}
                 value={away}
-                onChange={setAway}
+                onChange={(v) => {
+                  setAway(v);
+                  setSave({ status: "idle" });
+                }}
               />
             </div>
 
