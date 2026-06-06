@@ -1,17 +1,12 @@
 import Link from "next/link";
 
-import { signOut } from "@/app/actions/auth";
+import NavMenu from "@/components/NavMenu";
 import { createClient } from "@/lib/supabase/server";
-
-const NAV_LINKS = [
-  { href: "/matches", label: "Matches" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/my-predictions", label: "My Predictions" },
-] as const;
 
 /**
  * App-wide navigation. Server component: reads the session and (if signed in)
- * the user's profile so the Admin link only renders for admins.
+ * the user's profile so the Admin link only renders for admins. The interactive
+ * authenticated cluster (with responsive hamburger menu) lives in NavMenu.
  */
 export default async function Navbar() {
   const supabase = createClient();
@@ -41,40 +36,7 @@ export default async function Navbar() {
         </Link>
 
         {user ? (
-          <div className="flex items-center gap-1 text-sm sm:gap-2">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-md px-2 py-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-              >
-                {link.label}
-              </Link>
-            ))}
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="rounded-md px-2 py-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-              >
-                Admin
-              </Link>
-            )}
-            <Link
-              href="/profile"
-              className="rounded-md px-2 py-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-              title="Edit profile"
-            >
-              {displayName || "Profile"}
-            </Link>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="rounded-md border border-slate-200 px-3 py-1.5 text-slate-700 transition-colors hover:bg-slate-100"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
+          <NavMenu isAdmin={isAdmin} displayName={displayName} />
         ) : (
           <Link
             href="/login"
