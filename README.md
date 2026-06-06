@@ -1,230 +1,93 @@
-# 🏆 Quiniela Mundial 2026
+# Quinela — World Cup Score Prediction App
 
-Plataforma familiar de predicciones para el Mundial FIFA 2026.
-**Stack:** Next.js 14 · Supabase · Tailwind CSS · API-Football · Vercel
+Predict exact scorelines for World Cup matches and earn points. Built with
+**Next.js 14 (App Router) + Supabase** (magic-link auth, Postgres RLS + triggers).
 
----
+Scoring: exact score = **3 pts**, correct winner/draw only = **1 pt**, wrong = **0**.
+Predictions lock **1 hour before kickoff** (enforced by DB triggers — the server is
+the source of truth; the client only mirrors the lock for UX).
 
-## 🚀 GUÍA DE DEPLOY PASO A PASO
-
-### PASO 1 — Crear proyecto en Supabase
-
-1. Ir a **https://supabase.com** → "Start your project" → Sign in con GitHub
-2. Clic en **"New project"**
-   - Organization: tu nombre
-   - Name: `quiniela-2026`
-   - Database Password: generá uno seguro y guardalo
-   - Region: **US East (N. Virginia)** — más cerca de las sedes
-3. Esperar ~2 minutos hasta que cree la base de datos
-
-4. Ir a **SQL Editor** (ícono de base de datos en el sidebar izquierdo)
-5. Clic en **"New query"**
-6. Pegar todo el contenido de `supabase-schema.sql` y clic en **"Run"**
-   - Deberías ver "Success" en verde
-
-7. Ir a **Settings → API** y copiar:
-   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
-   - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
-
----
-
-### PASO 2 — Obtener API key de API-Football
-
-1. Ir a **https://www.api-football.com** → "Get your API key"
-2. Registrarse gratis (plan Free: 100 llamadas/día)
-3. Ir a tu dashboard → copiar el **API Key**
-4. Guardarlo como `API_FOOTBALL_KEY`
-
-> 💡 **Tip:** El plan gratuito es suficiente durante el Mundial.
-> Los días de partido hay ~8 partidos → ~40 llamadas/día (cada 5 min durante 6 horas).
-
----
-
-### PASO 3 — Configurar variables de entorno localmente
-
-1. Copiar el archivo de ejemplo:
-   ```bash
-   cp .env.local .env.local.backup  # ya existe, solo revisarlo
-   ```
-
-2. Editar `.env.local` con tus valores reales:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://abcdefghij.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
-   SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
-   API_FOOTBALL_KEY=abc123...
-   CRON_SECRET=mi_secreto_super_largo_2026
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
-   ```
-
----
-
-### PASO 4 — Correr localmente
+## Setup
 
 ```bash
-# Instalar dependencias
 npm install
-
-# Iniciar servidor de desarrollo
-npm run dev
+cp .env.example .env.local   # then fill in the values (already provided for this project)
+npm run dev                  # http://localhost:3000
 ```
 
-Abrí **http://localhost:3000** — deberías ver la landing.
+Required env vars (see `.env.example`):
 
----
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only — admin sync routes)
+- `FOOTBALL_API_KEY`, `FOOTBALL_API_HOST=v3.football.api-sports.io`
+  (API-Football Free plan = 100 req/day — only called from admin sync routes, never on page load)
 
-### PASO 5 — Subir a Vercel (deploy gratuito)
-
-#### Opción A — Desde la terminal (recomendado)
+## Verify the build
 
 ```bash
-# Instalar Vercel CLI
-npm i -g vercel
-
-# Login
-vercel login
-
-# Deploy (primera vez hace las preguntas de configuración)
-vercel
-
-# Para producción
-vercel --prod
+npx tsc --noEmit   # type-check
+npm run build      # production build
 ```
 
-#### Opción B — Desde el dashboard de Vercel
+## How to log in (QA)
 
-1. Ir a **https://vercel.com** → Sign in con GitHub
-2. Clic en **"New Project"**
-3. Importar tu repositorio de GitHub con el código
-4. Vercel detecta Next.js automáticamente → clic en **"Deploy"**
+Auth is passwordless **magic link** (Supabase `signInWithOtp`). The callback at
+`/auth/callback` handles **both** the PKCE `?code=` flow (normal emailed links) and the
+`?token_hash=&type=` flow (Admin-API generated links), and honors `next` / `redirect_to`.
 
-#### Configurar variables de entorno en Vercel
+Because SMTP isn't configured, QA logs in **without email** via the Supabase Admin API
+`generate_link`, which returns an `action_link` (and `email_otp`) without sending mail:
 
-1. Ir a tu proyecto en Vercel → **Settings → Environment Variables**
-2. Agregar una por una todas las variables de `.env.local`:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `API_FOOTBALL_KEY`
-   - `CRON_SECRET`
-   - `NEXT_PUBLIC_APP_URL` (con tu dominio de Vercel, ej: `https://quiniela-2026.vercel.app`)
+1. Generate a magic link for the test user (server-side, using the service-role key):
 
-3. Hacer redeploy: **Deployments → ··· → Redeploy**
+   ```bash
+   curl -s -X POST "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/admin/generate_link" \
+     -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"type":"magiclink","email":"than.cr07@gmail.com",
+          "options":{"redirect_to":"http://localhost:3000/auth/callback?next=/matches"}}'
+   ```
 
----
+2. Open the returned `action_link` in the browser. Supabase verifies the token and
+   redirects to `/auth/callback`, which establishes the cookie session and lands you on
+   `/matches`.
 
-### PASO 6 — Configurar el Cron Job en Vercel
+The test user **than.cr07@gmail.com** already exists and is an admin.
 
-El archivo `vercel.json` ya tiene la configuración. Solo tenés que:
+### Making a user admin
 
-1. Editar `vercel.json` y reemplazar `REEMPLAZAR_CON_TU_CRON_SECRET` con el mismo
-   valor que pusiste en `CRON_SECRET`
-2. Hacer commit y push → Vercel lo detecta automáticamente
-3. Verificar en Vercel → **Settings → Cron Jobs** que aparezca el cron
-
-> ⚠️  Los Cron Jobs en Vercel requieren plan **Hobby o superior** (gratis).
-> El cron corre una vez al día y llama a `/api/sync-results`.
-
----
-
-### PASO 7 — Cargar los partidos (seed inicial)
-
-Antes del Mundial, tenés que cargar los 48 partidos en la base de datos.
-
-**Opción A — SQL manual en Supabase:**
 ```sql
--- Ejemplo: cargar equipos del Grupo A
-INSERT INTO public.teams VALUES 
-  ('usa', 'Estados Unidos', '🇺🇸', 'us', 'A', 'USA'),
-  ('pan', 'Panamá',         '🇵🇦', 'pa', 'A', 'PAN'),
-  ('bol', 'Bolivia',        '🇧🇴', 'bo', 'A', 'BOL'),
-  ('aze', 'Azerbaiyán',     '🇦🇿', 'az', 'A', 'AZE');
-
--- Cargar un partido
-INSERT INTO public.matches (group_id, home_team_id, away_team_id, match_date, external_api_id)
-VALUES ('A', 'usa', 'pan', '2026-06-11T20:00:00Z', 12345);
+update profiles set is_admin = true
+where id = (select id from auth.users where email = 'YOUR_EMAIL');
 ```
 
-**Opción B — Script automatizado** (crear `scripts/seed.ts`):
-```bash
-npx ts-node scripts/seed.ts
-```
-*(Pedime este script y te lo genero)*
+Admins see the **Admin** nav link and can create fixtures / enter results and run the
+Football API syncs.
 
-**Opción C — Via API-Football:**
-Llamar a `/api/sync-results` una vez para importar todos los fixtures.
+## Routes
 
----
+| Route             | Purpose                                                        |
+| ----------------- | -------------------------------------------------------------- |
+| `/`               | Landing page                                                   |
+| `/login`          | Magic-link sign-in                                             |
+| `/auth/callback`  | Exchanges the link for a session                               |
+| `/matches`        | Upcoming/locked/finished matches; enter predictions            |
+| `/my-predictions` | Your predictions and points                                    |
+| `/leaderboard`    | Ranked standings                                               |
+| `/profile`        | Edit display name (shown on leaderboard)                       |
+| `/admin`          | Admin-only: manage fixtures, enter results, trigger API syncs  |
 
-## 📁 ESTRUCTURA DEL PROYECTO
+Protected routes (`/matches`, `/leaderboard`, `/my-predictions`, `/admin`, `/profile`)
+redirect to `/login` when there's no session (enforced in middleware).
 
-```
-quiniela-mundial-2026/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx              ← Landing
-│   │   ├── layout.tsx            ← Root layout + fuentes
-│   │   ├── globals.css
-│   │   ├── profile/page.tsx      ← Crear perfil
-│   │   ├── predictions/page.tsx  ← Mis predicciones
-│   │   ├── results/page.tsx      ← Resultados reales
-│   │   ├── leaderboard/page.tsx  ← Ranking
-│   │   └── api/
-│   │       ├── sync-results/     ← Cron: actualiza marcadores
-│   │       └── predictions/      ← POST: guarda predicción
-│   ├── components/
-│   │   ├── layout/Navbar.tsx
-│   │   └── ui/
-│   │       ├── MatchPredictionCard.tsx
-│   │       └── LeaderboardTop10.tsx
-│   ├── lib/
-│   │   ├── supabase.ts           ← Clientes Supabase
-│   │   ├── scoring.ts            ← Sistema de puntos
-│   │   ├── api-football.ts       ← Integración API
-│   │   └── matches-data.ts       ← Datos estáticos equipos
-│   └── types/index.ts            ← Tipos TypeScript
-├── supabase-schema.sql           ← Schema completo BD
-├── vercel.json                   ← Cron Jobs
-├── .env.local                    ← Variables de entorno
-└── README.md
-```
+## Architecture notes
 
----
-
-## 🎯 SISTEMA DE PUNTOS
-
-Configurado en `src/types/index.ts` — fácil de cambiar:
-
-```typescript
-export const SCORING = {
-  EXACT_SCORE: 3,      // Marcador exacto
-  CORRECT_RESULT: 1,   // Solo ganador/empate
-  WRONG: 0,
-}
-```
-
----
-
-## 📱 LINKS ÚTILES
-
-- **Supabase Dashboard:** https://supabase.com/dashboard
-- **Vercel Dashboard:** https://vercel.com/dashboard
-- **API-Football Docs:** https://www.api-football.com/documentation-v3
-- **API-Football Fixtures:** `GET /fixtures?league=1&season=2026`
-
----
-
-## ❓ PROBLEMAS FRECUENTES
-
-**"Error: Invalid API key"** → Revisá `API_FOOTBALL_KEY` en las env vars de Vercel
-
-**"relation 'users' does not exist"** → No corriste el SQL schema en Supabase
-
-**El cron no corre** → Verificá que `CRON_SECRET` en `vercel.json` coincida con la env var
-
-**Predicciones no se guardan** → Revisá las políticas RLS en Supabase y que `SUPABASE_SERVICE_ROLE_KEY` esté configurada
-
----
-
-¡Listo para el Mundial 2026! 🌎⚽🏆
+- Supabase clients: `@/lib/supabase/client` (browser), `@/lib/supabase/server` (server,
+  cookie-based), `@/lib/supabase/middleware` + `src/middleware.ts` (session refresh +
+  route protection), `@/lib/supabase/admin` (service-role, server-only).
+- DB types: `@/lib/database.types` (`Database`, plus `Profile` / `Match` / `Prediction`
+  / `LeaderboardRow`).
+- Lock helpers (UX mirror of the DB rule): `@/lib/lock`.
+- **Do not** duplicate scoring logic on the client as the authority — Postgres triggers
+  compute points.

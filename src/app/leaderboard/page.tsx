@@ -1,118 +1,233 @@
-// src/app/leaderboard/page.tsx
-import Navbar from '@/components/layout/Navbar'
-import LeaderboardTop10 from '@/components/ui/LeaderboardTop10'
-import { createServerSupabase } from '@/lib/supabase'
-import type { LeaderboardEntry } from '@/types'
+import { createClient } from "@/lib/supabase/server";
+import type { LeaderboardRow } from "@/lib/database.types";
 
-// Revalidar cada 5 minutos
-export const revalidate = 300
+export const dynamic = "force-dynamic";
 
-async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  const supabase = createServerSupabase()
+export const metadata = {
+  title: "Leaderboard — Quinela",
+};
 
-  // Calculamos el leaderboard dinámicamente desde predictions
-  const { data, error } = await supabase
-    .from('predictions')
-    .select(`
-      user_id,
-      predicted_home,
-      predicted_away,
-      points,
-      locked,
-      users ( name, nickname, avatar_icon, color ),
-      matches ( home_score, away_score, status )
-    `)
-    .eq('locked', true)
+/** A leaderboard row with non-null numeric fields and a computed rank. */
+interface RankedRow {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  total_points: number;
+  exact_count: number;
+  winner_count: number;
+  predictions_made: number;
+}
 
-  if (error || !data) return []
+/**
+ * Ranks rows by total_points desc, then exact_count desc (tie-break).
+ * Equal (points, exact) share the same rank (standard competition ranking).
+ */
+function rankRows(rows: LeaderboardRow[]): RankedRow[] {
+  const normalized = rows
+    .filter((r) => r.user_id != null)
+    .map((r) => ({
+      user_id: r.user_id as string,
+      display_name: r.display_name ?? "Anonymous",
+      total_points: r.total_points ?? 0,
+      exact_count: r.exact_count ?? 0,
+      winner_count: r.winner_count ?? 0,
+      predictions_made: r.predictions_made ?? 0,
+    }))
+    .sort((a, b) => {
+      if (b.total_points !== a.total_points)
+        return b.total_points - a.total_points;
+      if (b.exact_count !== a.exact_count) return b.exact_count - a.exact_count;
+      return a.display_name.localeCompare(b.display_name);
+    });
 
-  // Agrupar por usuario
-  const userMap = new Map<string, LeaderboardEntry>()
+  const ranked: RankedRow[] = [];
+  let lastRank = 0;
+  let lastPoints: number | null = null;
+  let lastExact: number | null = null;
 
-  for (const pred of data) {
-    const user = pred.users as any
-    const match = pred.matches as any
-    if (!user) continue
+  normalized.forEach((row, index) => {
+    const tiedWithPrev =
+      row.total_points === lastPoints && row.exact_count === lastExact;
+    const rank = tiedWithPrev ? lastRank : index + 1;
+    lastRank = rank;
+    lastPoints = row.total_points;
+    lastExact = row.exact_count;
+    ranked.push({ rank, ...row });
+  });
 
-    if (!userMap.has(pred.user_id)) {
-      userMap.set(pred.user_id, {
-        user_id: pred.user_id,
-        name: user.name,
-        nickname: user.nickname,
-        avatar_icon: user.avatar_icon,
-        color: user.color,
-        total_points: 0,
-        exact_count: 0,
-        correct_count: 0,
-        played_count: 0,
-      })
-    }
+  return ranked;
+}
 
-    const entry = userMap.get(pred.user_id)!
-    if (match?.status === 'final' && pred.points !== null) {
-      entry.total_points += pred.points
-      if (pred.points === 3) entry.exact_count++
-      if (pred.points === 1) entry.correct_count++
-      entry.played_count++
-    }
-  }
-
-  return Array.from(userMap.values())
-    .sort((a, b) => b.total_points - a.total_points || b.exact_count - a.exact_count)
+function rankBadge(rank: number): string {
+  if (rank === 1) return "🥇";
+  if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
+  return "";
 }
 
 export default async function LeaderboardPage() {
-  const entries = await getLeaderboard()
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select(
+      "user_id, display_name, total_points, exact_count, winner_count, predictions_made",
+    );
+
+  const rows = rankRows((data as LeaderboardRow[] | null) ?? []);
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-pitch-900 page-enter">
+    <div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">Leaderboard</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Exact score = 3 pts · correct outcome = 1 pt. Ties broken by exact-score
+          count.
+        </p>
+      </header>
 
-        {/* Header */}
-        <div className="bg-pitch-800 border-b border-white/6 px-5 py-5 flex items-center gap-4">
-          <span className="text-3xl">🏆</span>
-          <div>
-            <h1 className="font-bebas text-[24px] tracking-widest text-gold">RANKING FAMILIAR</h1>
-            <p className="text-[11px] text-[#B8B0A0] uppercase tracking-wider">
-              {entries.length} participante{entries.length !== 1 ? 's' : ''} · Actualizado automáticamente
-            </p>
-          </div>
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Couldn&apos;t load the leaderboard. Please try again.
         </div>
-
-        {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-5">
-            <span className="text-5xl mb-4">⏳</span>
-            <h2 className="font-bebas text-xl tracking-widest text-[#B8B0A0] mb-2">SIN DATOS AÚN</h2>
-            <p className="text-[#7A7060] text-sm">
-              El ranking aparece cuando haya predicciones confirmadas y resultados reales.
-            </p>
-          </div>
-        ) : (
-          <LeaderboardTop10 entries={entries} />
-        )}
-
-        {/* Scoring legend */}
-        <div className="max-w-md mx-auto px-5 py-6">
-          <div className="bg-pitch-800 border border-white/6 rounded-lg p-4">
-            <h3 className="font-bebas tracking-widest text-[14px] text-gold mb-3">SISTEMA DE PUNTOS</h3>
-            <div className="space-y-2 text-[12px]">
-              <div className="flex justify-between">
-                <span className="text-[#B8B0A0]">⭐ Marcador exacto</span>
-                <span className="text-green-400 font-bold">+3 puntos</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#B8B0A0]">✓ Resultado correcto</span>
-                <span className="text-gold font-bold">+1 punto</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#B8B0A0]">✗ Sin acierto</span>
-                <span className="text-[#7A7060] font-bold">0 puntos</span>
-              </div>
-            </div>
-          </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+          No predictions scored yet. Once matches finish, points appear here.
         </div>
-      </main>
-    </>
-  )
+      ) : (
+        <>
+          {/* Mobile (< sm): stacked cards — no horizontal clipping, every stat
+              is visible without scrolling. */}
+          <ul className="space-y-2 sm:hidden">
+            {rows.map((row) => {
+              const isCurrentUser = user?.id === row.user_id;
+              return (
+                <li
+                  key={row.user_id}
+                  className={`rounded-lg border p-3 ${
+                    isCurrentUser
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 tabular-nums text-slate-700">
+                        {rankBadge(row.rank)}
+                        {row.rank}
+                      </span>
+                      <span className="truncate font-medium text-slate-900">
+                        {row.display_name}
+                      </span>
+                      {isCurrentUser && (
+                        <span className="shrink-0 rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-right">
+                      <span className="text-lg font-bold tabular-nums text-slate-900">
+                        {row.total_points}
+                      </span>
+                      <span className="ml-1 text-xs text-slate-500">pts</span>
+                    </span>
+                  </div>
+                  <dl className="mt-2 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2 text-center text-xs">
+                    <div>
+                      <dt className="text-slate-500">Exact</dt>
+                      <dd className="font-semibold tabular-nums text-slate-700">
+                        {row.exact_count}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Outcome</dt>
+                      <dd className="font-semibold tabular-nums text-slate-700">
+                        {row.winner_count}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Predictions</dt>
+                      <dd className="font-semibold tabular-nums text-slate-700">
+                        {row.predictions_made}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* sm and up: full table. */}
+          <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white sm:block">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 font-semibold">#</th>
+                  <th className="px-4 py-3 font-semibold">Player</th>
+                  <th className="px-4 py-3 text-right font-semibold">Points</th>
+                  <th className="px-4 py-3 text-right font-semibold">
+                    <span title="Exact-score predictions (3 pts each)">
+                      Exact
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">
+                    <span title="Correct-outcome-only predictions (1 pt each)">
+                      Outcome
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">
+                    Predictions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const isCurrentUser = user?.id === row.user_id;
+                  return (
+                    <tr
+                      key={row.user_id}
+                      className={`border-b border-slate-100 last:border-0 ${
+                        isCurrentUser
+                          ? "bg-amber-50 font-medium"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-700">
+                        <span className="mr-1">{rankBadge(row.rank)}</span>
+                        {row.rank}
+                      </td>
+                      <td className="px-4 py-3 text-slate-900">
+                        {row.display_name}
+                        {isCurrentUser && (
+                          <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                            You
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
+                        {row.total_points}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {row.exact_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {row.winner_count}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                        {row.predictions_made}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }

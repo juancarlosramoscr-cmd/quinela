@@ -1,73 +1,71 @@
-// src/app/page.tsx
-import Link from 'next/link'
-import { Trophy, Users, Star, Zap } from 'lucide-react'
+import Link from "next/link";
 
-export default function HomePage() {
+import { createClient } from "@/lib/supabase/server";
+
+export default async function Home() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
-    <main className="min-h-screen bg-pitch-900">
+    <div className="mx-auto max-w-2xl py-10 text-center">
+      <div className="mb-4 text-5xl" aria-hidden>
+        ⚽
+      </div>
+      <h1 className="mb-3 text-3xl font-bold text-slate-900 sm:text-4xl">
+        Quinela — World Cup
+      </h1>
+      <p className="mb-8 text-balance text-lg text-slate-600">
+        Predict the exact scoreline of every World Cup match. Exact score earns 3
+        points, getting the winner right earns 1. Lock in your picks before
+        kickoff and climb the leaderboard.
+      </p>
 
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden flex flex-col items-center justify-center text-center px-5 py-16 min-h-[88vh] stadium-bg">
-
-        {/* Glow background */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-gold/5 blur-3xl" />
-        </div>
-
-        {/* Badge */}
-        <div className="relative z-10 inline-flex items-center gap-2 bg-gold/10 border border-gold/35 rounded-full px-4 py-1.5 text-gold text-[11px] font-bold tracking-widest uppercase mb-6">
-          🌎 FIFA World Cup 2026 · USA / CAN / MEX
-        </div>
-
-        {/* Logo placeholder — reemplazar con la imagen real */}
-        <div className="relative z-10 mb-6">
-          <div className="text-[80px] drop-shadow-[0_0_24px_rgba(201,168,76,0.5)]">🏆</div>
-        </div>
-
-        <h1 className="relative z-10 font-bebas text-[clamp(52px,14vw,96px)] leading-[0.9] tracking-widest text-white mb-3">
-          QUINIELA<br /><span className="text-gold">FAMILIAR</span>
-        </h1>
-
-        <p className="relative z-10 text-[#B8B0A0] text-[15px] max-w-sm leading-relaxed mb-8">
-          Predecí todos los partidos del Mundial 2026, competí con familia y amigos, y seguí el ranking en tiempo real.
-        </p>
-
-        <div className="relative z-10 flex gap-3 flex-wrap justify-center">
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {user ? (
+          <>
+            <Link
+              href="/matches"
+              className="rounded-md bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700"
+            >
+              View matches
+            </Link>
+            <Link
+              href="/leaderboard"
+              className="rounded-md border border-slate-300 px-5 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100"
+            >
+              Leaderboard
+            </Link>
+          </>
+        ) : (
           <Link
-            href="/profile"
-            className="bg-gold hover:bg-gold-light text-pitch-900 font-bold text-sm tracking-widest uppercase px-7 py-3 rounded transition-colors"
+            href="/login"
+            className="rounded-md bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700"
           >
-            ⚽ Crear mi perfil
+            Sign in to play
           </Link>
-          <Link
-            href="/leaderboard"
-            className="border border-gold/40 hover:border-gold text-gold font-semibold text-sm tracking-wider uppercase px-6 py-3 rounded transition-colors"
-          >
-            Ver ranking
-          </Link>
-        </div>
-      </section>
+        )}
+      </div>
 
-      {/* ── FEATURES ─────────────────────────────────────────── */}
-      <section className="px-5 py-12 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="mt-12 grid gap-4 text-left sm:grid-cols-3">
         {[
-          { icon: <Trophy size={24} />, title: 'Predecí', desc: 'Ingresá el marcador exacto de cada partido de la fase de grupos.' },
-          { icon: <Zap size={24} />, title: 'Se bloquea', desc: 'Confirmás con "Siguiente" y la predicción queda fija. Sin trampa.' },
-          { icon: <Star size={24} />, title: 'Puntuás', desc: '3 pts marcador exacto · 1 pt resultado correcto · 0 pts si fallás.' },
-          { icon: <Users size={24} />, title: 'Competís', desc: 'Ranking familiar actualizado automáticamente con cada resultado.' },
-        ].map(({ icon, title, desc }) => (
-          <div key={title} className="bg-pitch-800 border border-white/6 rounded-lg p-5">
-            <div className="text-gold mb-3">{icon}</div>
-            <div className="font-barlow-condensed text-gold text-[13px] font-bold uppercase tracking-wider mb-2">{title}</div>
-            <p className="text-[#B8B0A0] text-[12px] leading-relaxed">{desc}</p>
+          { t: "Exact score", d: "3 points", e: "🎯" },
+          { t: "Right outcome", d: "1 point", e: "✅" },
+          { t: "Wrong", d: "0 points", e: "❌" },
+        ].map((c) => (
+          <div
+            key={c.t}
+            className="rounded-lg border border-slate-200 bg-white p-4"
+          >
+            <div className="text-2xl" aria-hidden>
+              {c.e}
+            </div>
+            <div className="mt-1 font-semibold text-slate-900">{c.t}</div>
+            <div className="text-sm text-slate-500">{c.d}</div>
           </div>
         ))}
-      </section>
-
-      {/* ── FOOTER ───────────────────────────────────────────── */}
-      <footer className="text-center py-6 text-[#7A7060] text-[11px] tracking-widest uppercase border-t border-white/5">
-        Quiniela Familiar · Mundial 2026 · Para uso personal
-      </footer>
-    </main>
-  )
+      </div>
+    </div>
+  );
 }

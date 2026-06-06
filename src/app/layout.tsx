@@ -1,46 +1,38 @@
-// src/app/layout.tsx
-import type { Metadata } from 'next'
-import { Barlow, Barlow_Condensed, Bebas_Neue } from 'next/font/google'
-import './globals.css'
+import type { Metadata } from "next";
+import localFont from "next/font/local";
+import "./globals.css";
 
-const bebas = Bebas_Neue({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-bebas',
-  display: 'swap',
-})
+import Navbar from "@/components/Navbar";
 
-const barlow = Barlow({
-  weight: ['400', '500', '600', '700'],
-  subsets: ['latin'],
-  variable: '--font-barlow',
-  display: 'swap',
-})
-
-const barlowCondensed = Barlow_Condensed({
-  weight: ['400', '600', '700'],
-  subsets: ['latin'],
-  variable: '--font-barlow-condensed',
-  display: 'swap',
-})
+const geistSans = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-geist-sans",
+  weight: "100 900",
+});
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
+  weight: "100 900",
+});
 
 export const metadata: Metadata = {
-  title: 'Quiniela Mundial 2026',
-  description: 'Predecí todos los partidos del Mundial 2026. Competí con familia y amigos.',
-  icons: { icon: '/favicon.ico' },
-  openGraph: {
-    title: 'Quiniela Mundial 2026 🏆',
-    description: '¡Armá tus predicciones y competí con tu familia!',
-    type: 'website',
-  },
-}
+  title: "Quinela — World Cup",
+  description: "Predict exact scorelines for World Cup matches and earn points.",
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="es" className={`${bebas.variable} ${barlow.variable} ${barlowCondensed.variable}`}>
-      <body className="bg-pitch-900 text-[#F0EDE8] font-barlow antialiased min-h-screen">
-        {children}
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
+      >
+        <Navbar />
+        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
       </body>
     </html>
-  )
+  );
 }
