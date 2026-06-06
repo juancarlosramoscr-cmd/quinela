@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
+import { useFormState, useFormStatus } from "react-dom";
 
 import { finalizeMatch, type AdminActionResult } from "@/app/actions/admin";
 import type { Match } from "@/lib/database.types";
@@ -31,7 +30,7 @@ function SaveButton({ finished }: { finished: boolean }) {
 }
 
 export default function MatchAdminRow({ match }: { match: Match }) {
-  const [state, formAction] = useActionState<AdminActionResult | null, FormData>(
+  const [state, formAction] = useFormState<AdminActionResult | null, FormData>(
     finalizeMatch,
     null,
   );

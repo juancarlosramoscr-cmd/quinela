@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
-import { useFormStatus } from "react-dom";
+import { useEffect, useRef } from "react";
+import { useFormState, useFormStatus } from "react-dom";
 
 import { createMatch, type AdminActionResult } from "@/app/actions/admin";
 
@@ -19,7 +19,7 @@ function SubmitButton() {
 }
 
 export default function CreateMatchForm() {
-  const [state, formAction] = useActionState<AdminActionResult | null, FormData>(
+  const [state, formAction] = useFormState<AdminActionResult | null, FormData>(
     createMatch,
     null,
   );
