@@ -1,0 +1,43 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gold: #C9A84C;
+  --gold-light: #E8C97A;
+  --gold-dark: #9A6E2A;
+  --green-pitch: #1A5C2E;
+  --green-bright: #2D8B4E;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #12181E; }
+::-webkit-scrollbar-thumb { background: #243040; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #C9A84C44; }
+
+/* Remove number input arrows */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; }
+input[type='number'] { -moz-appearance: textfield; }
+
+/* Score input gold glow on focus */
+.score-input:focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.15);
+}
+
+/* Smooth page transitions */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: pageIn 0.25s ease forwards; }
+
+/* Stadium grid background */
+.stadium-bg {
+  background-image:
+    repeating-linear-gradient(0deg,  transparent, transparent 28px, rgba(201,168,76,0.05) 28px, rgba(201,168,76,0.05) 29px),
+    repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(201,168,76,0.05) 28px, rgba(201,168,76,0.05) 29px);
+}
