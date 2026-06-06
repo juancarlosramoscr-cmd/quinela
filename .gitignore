@@ -37,3 +37,6 @@ next-env.d.ts
 
 # QA artifacts (screenshots from the browse-based QA pass)
 qa-ui-screens/
+
+# Claude Code harness runtime state (should not be tracked)
+.claude/scheduled_tasks.lock
