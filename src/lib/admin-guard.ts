@@ -13,9 +13,9 @@ export interface AdminContext {
  * RLS already restricts match writes to admins, but we check here too so the
  * UI/route can fail fast and clearly.
  */
-export async function requireAdmin():
-  | Promise<{ ok: true; userId: string }>
-  | Promise<{ ok: false; status: 401 | 403 }> {
+export async function requireAdmin(): Promise<
+  { ok: true; userId: string } | { ok: false; status: 401 | 403 }
+> {
   const supabase = createClient();
   const {
     data: { user },
