@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# QA artifacts (screenshots from the browse-based QA pass)
+qa-ui-screens/
