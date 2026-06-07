@@ -40,3 +40,6 @@ qa-ui-screens/
 
 # Claude Code harness runtime state (should not be tracked)
 .claude/scheduled_tasks.lock
+
+# JetBrains IDE
+.idea/
