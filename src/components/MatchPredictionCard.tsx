@@ -10,6 +10,7 @@ import {
   lockAt,
   msUntilLock,
 } from "@/lib/lock";
+import MatchPicks from "@/components/MatchPicks";
 import type { Match, Prediction } from "@/lib/database.types";
 
 interface Props {
@@ -252,6 +253,16 @@ export default function MatchPredictionCard({
         >
           {save.message}
         </p>
+      )}
+
+      {/* Everyone's picks become visible once the match is locked (RLS also
+          enforces this server-side, so it stays copy-proof before lock). */}
+      {locked && (
+        <MatchPicks
+          matchId={match.id}
+          currentUserId={userId}
+          finished={isFinished}
+        />
       )}
     </div>
   );
