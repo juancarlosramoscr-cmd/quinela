@@ -31,11 +31,14 @@ export default function MatchPicks({
   matchId,
   currentUserId,
   finished,
+  adminPreview = false,
 }: {
   matchId: string;
   currentUserId: string;
   /** When true, the match is over → show the points each pick earned. */
   finished: boolean;
+  /** True when an admin is viewing picks on a still-open match (oversight). */
+  adminPreview?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<PickRow[] | null>(null);
@@ -106,7 +109,14 @@ export default function MatchPicks({
         aria-expanded={open}
         className="flex w-full items-center justify-between text-xs font-medium text-slate-600 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-1"
       >
-        <span>{open ? "Hide all picks" : "See all picks"}</span>
+        <span>
+          {open ? "Hide all picks" : "See all picks"}
+          {adminPreview && (
+            <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              Admin
+            </span>
+          )}
+        </span>
         <span aria-hidden className="text-slate-400">
           {open ? "▲" : "▼"}
         </span>

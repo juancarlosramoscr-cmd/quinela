@@ -23,14 +23,17 @@ export default async function MatchesPage() {
   // Middleware protects this route, but guard defensively.
   if (!user) redirect("/login?redirectTo=/matches");
 
-  // Fetch matches and the current user's predictions in parallel.
-  const [matchesRes, predictionsRes] = await Promise.all([
+  // Fetch matches, the current user's predictions, and their admin flag in parallel.
+  const [matchesRes, predictionsRes, profileRes] = await Promise.all([
     supabase
       .from("matches")
       .select("*")
       .order("kickoff_at", { ascending: true }),
     supabase.from("predictions").select("*").eq("user_id", user.id),
+    supabase.from("profiles").select("is_admin").eq("id", user.id).single(),
   ]);
+
+  const isAdmin = profileRes.data?.is_admin === true;
 
   if (matchesRes.error) {
     return (
@@ -79,6 +82,7 @@ export default async function MatchesPage() {
                     match={match}
                     prediction={prediction}
                     userId={user.id}
+                    isAdmin={isAdmin}
                   />
                 ))}
               </div>

@@ -18,6 +18,8 @@ interface Props {
   prediction: Prediction | null;
   /** Current user's id, used to write the prediction row. */
   userId: string;
+  /** Admins can view everyone's picks even before a match locks. */
+  isAdmin?: boolean;
 }
 
 type SaveState =
@@ -30,6 +32,7 @@ export default function MatchPredictionCard({
   match,
   prediction,
   userId,
+  isAdmin = false,
 }: Props) {
   // Controlled inputs. Empty string => not yet entered.
   const [home, setHome] = useState<string>(
@@ -256,12 +259,15 @@ export default function MatchPredictionCard({
       )}
 
       {/* Everyone's picks become visible once the match is locked (RLS also
-          enforces this server-side, so it stays copy-proof before lock). */}
-      {locked && (
+          enforces this server-side, so it stays copy-proof before lock).
+          Admins can view them anytime — including while the match is still
+          open — for oversight; RLS grants admins the rows. */}
+      {(locked || isAdmin) && (
         <MatchPicks
           matchId={match.id}
           currentUserId={userId}
           finished={isFinished}
+          adminPreview={!locked && isAdmin}
         />
       )}
     </div>
