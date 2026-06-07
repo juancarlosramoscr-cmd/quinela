@@ -1,6 +1,6 @@
 # Quinela — World Cup Score Prediction App
 
-A web app where users register by email (magic link), predict exact scorelines for
+A web app where users register with email + password, predict exact scorelines for
 World Cup matches, and earn points. Built with **Next.js 14 (App Router) + Supabase**.
 
 ## Domain rules (the heart of the app — already enforced in the DB)
@@ -51,9 +51,15 @@ See `.env.example` for the template.
 
 ## Auth
 
-Supabase magic-link (passwordless OTP). `signInWithOtp` → email → `/auth/callback`
-exchanges code for session. Use `@supabase/ssr` for cookie-based sessions + middleware
-session refresh.
+Supabase email + password. Server actions in `src/app/actions/auth.ts`:
+`signIn` (`signInWithPassword`), `signUp` (`auth.signUp`, profile auto-created by the
+`handle_new_user` trigger), and `signOut`. The `/login` page has a sign in / sign up
+toggle. Use `@supabase/ssr` for cookie-based sessions + middleware session refresh.
+
+Email confirmation is **disabled** in the Supabase project, so signup yields an
+immediate session. (If it were enabled, `signUp` returns no session and the UI shows a
+"confirm your email" message — but that path needs working SMTP.) There is no
+`/auth/callback` route — password auth doesn't use email links.
 
 ## Making a test admin
 
