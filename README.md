@@ -1,7 +1,7 @@
 # Quinela — World Cup Score Prediction App
 
 Predict exact scorelines for World Cup matches and earn points. Built with
-**Next.js 14 (App Router) + Supabase** (magic-link auth, Postgres RLS + triggers).
+**Next.js 14 (App Router) + Supabase** (email + password auth, Postgres RLS + triggers).
 
 Scoring: exact score = **3 pts**, correct winner/draw only = **1 pt**, wrong = **0**.
 Predictions lock **1 hour before kickoff** (enforced by DB triggers — the server is
@@ -29,31 +29,16 @@ npx tsc --noEmit   # type-check
 npm run build      # production build
 ```
 
-## How to log in (QA)
+## How to log in
 
-Auth is passwordless **magic link** (Supabase `signInWithOtp`). The callback at
-`/auth/callback` handles **both** the PKCE `?code=` flow (normal emailed links) and the
-`?token_hash=&type=` flow (Admin-API generated links), and honors `next` / `redirect_to`.
+Auth is **email + password** (Supabase `signInWithPassword` / `signUp`). The `/login`
+page has a sign in / sign up toggle. Email confirmation is **disabled** in the Supabase
+project, so a new signup logs in immediately (no confirmation email needed).
 
-Because SMTP isn't configured, QA logs in **without email** via the Supabase Admin API
-`generate_link`, which returns an `action_link` (and `email_otp`) without sending mail:
-
-1. Generate a magic link for the test user (server-side, using the service-role key):
-
-   ```bash
-   curl -s -X POST "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/admin/generate_link" \
-     -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"type":"magiclink","email":"than.cr07@gmail.com",
-          "options":{"redirect_to":"http://localhost:3000/auth/callback?next=/matches"}}'
-   ```
-
-2. Open the returned `action_link` in the browser. Supabase verifies the token and
-   redirects to `/auth/callback`, which establishes the cookie session and lands you on
-   `/matches`.
-
-The test user **than.cr07@gmail.com** already exists and is an admin.
+- **New account:** open `/login`, choose "Create one", enter an email + password (min 6
+  chars). You're signed in and redirected to `/matches`. The `handle_new_user` trigger
+  creates your profile automatically.
+- **Existing admin test user:** **than.cr07@gmail.com** / **quinela123** (already an admin).
 
 ### Making a user admin
 
@@ -70,8 +55,7 @@ Football API syncs.
 | Route             | Purpose                                                        |
 | ----------------- | -------------------------------------------------------------- |
 | `/`               | Landing page                                                   |
-| `/login`          | Magic-link sign-in                                             |
-| `/auth/callback`  | Exchanges the link for a session                               |
+| `/login`          | Email + password sign in / sign up                             |
 | `/matches`        | Upcoming/locked/finished matches; enter predictions            |
 | `/my-predictions` | Your predictions and points                                    |
 | `/leaderboard`    | Ranked standings                                               |
