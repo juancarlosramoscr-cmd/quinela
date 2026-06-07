@@ -3,15 +3,16 @@
  * Seed the quinela database with the FIFA World Cup 2026 GROUP STAGE.
  *
  * - Clears all existing predictions + matches, then inserts all 72 group matches.
- * - Teams are the REAL final-draw groups (drawn 5 Dec 2025).
- * - The group-stage runs 11–27 Jun 2026. Each group's 6 matches are spread across
- *   that window; kickoff times are defined in the user's LOCAL timezone (GMT-6,
- *   "America/Mexico_City" / Central) and converted to UTC for storage (the
- *   kickoff_at column is timestamptz; the app renders in each viewer's local time).
+ * - Teams + EXACT official kickoff times/venues are the real published schedule
+ *   (source: ESPN official fixtures; final draw 5 Dec 2025).
+ * - Times below are the official ET (US Eastern) kickoffs. June is EDT = UTC-4,
+ *   so we convert ET → UTC by ADDING 4 hours, and store as timestamptz. The app
+ *   renders kickoffs in each viewer's local time; for the user that's GMT-6
+ *   (ET − 2h, e.g. 3 p.m. ET = 1 p.m. GMT-6).
  *
  * Usage:
  *   node scripts/seed-worldcup-2026.mjs           # clear + seed
- *   node scripts/seed-worldcup-2026.mjs --dry     # print what it would do, no writes
+ *   node scripts/seed-worldcup-2026.mjs --dry     # preview (shows GMT-6), no writes
  *
  * Requires .env.local with NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
  */
@@ -50,28 +51,37 @@ if (!SUPABASE_URL || !SERVICE_KEY || SUPABASE_URL.includes("YOUR-PROJECT")) {
   process.exit(1);
 }
 
-// ── Timezone: GMT-6 (no DST; matches the user's stated offset) ──────────────
-// Mexico abolished DST in 2022, so Central Mexico is a fixed UTC-6 year-round.
-const TZ_OFFSET_HOURS = -6;
+// In June, US Eastern Time is EDT = UTC-4. ET → UTC means ADD 4 hours.
+const ET_TO_UTC_HOURS = 4;
 
 /**
- * Build a UTC ISO timestamp from a local (GMT-6) date + time.
- * @param {string} date  "YYYY-MM-DD" in local GMT-6
- * @param {string} time  "HH:MM" 24h in local GMT-6
+ * Parse an ET clock string like "3 p.m.", "10 p.m.", "12 a.m.", "7:30 p.m."
+ * into 24h { h, m }.
  */
-function localToUtcISO(date, time) {
+function parseET(t) {
+  const m = t.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)$/i);
+  if (!m) throw new Error(`Unparseable ET time: "${t}"`);
+  let h = Number(m[1]);
+  const min = m[2] ? Number(m[2]) : 0;
+  const pm = /p/i.test(m[3]);
+  if (h === 12) h = 0; // 12 a.m. -> 0, 12 p.m. -> 12 (handled by +12 below)
+  if (pm) h += 12;
+  return { h, m: min };
+}
+
+/** Build a UTC ISO timestamp from an ET date + ET clock string. */
+function etToUtcISO(date, etTime) {
   const [y, mo, d] = date.split("-").map(Number);
-  const [h, mi] = time.split(":").map(Number);
-  // Local GMT-6 → UTC means ADDING 6 hours.
-  const utcMs = Date.UTC(y, mo - 1, d, h - TZ_OFFSET_HOURS, mi);
+  const { h, m } = parseET(etTime);
+  const utcMs = Date.UTC(y, mo - 1, d, h + ET_TO_UTC_HOURS, m);
   return new Date(utcMs).toISOString();
 }
 
-// ── The 12 real groups from the 2026 final draw ─────────────────────────────
-// Order within each group = seeded position 1..4 (used by the fixture pattern).
+// ── Group lookup (real final-draw groups) for tagging each match's stage ────
+const GROUP_OF = {};
 const GROUPS = {
   A: ["Mexico", "South Africa", "South Korea", "Czechia"],
-  B: ["Canada", "Bosnia & Herzegovina", "Qatar", "Switzerland"],
+  B: ["Canada", "Bosnia and Herzegovina", "Qatar", "Switzerland"],
   C: ["Brazil", "Morocco", "Haiti", "Scotland"],
   D: ["United States", "Paraguay", "Australia", "Türkiye"],
   E: ["Germany", "Curaçao", "Ivory Coast", "Ecuador"],
@@ -83,74 +93,103 @@ const GROUPS = {
   K: ["Portugal", "DR Congo", "Uzbekistan", "Colombia"],
   L: ["England", "Croatia", "Ghana", "Panama"],
 };
+for (const [g, teams] of Object.entries(GROUPS)) {
+  for (const t of teams) GROUP_OF[t] = g;
+}
 
-// Canonical FIFA group round-robin order (by seeded position, 1-indexed):
-//   MD1: 1v2, 3v4   MD2: 1v3, 4v2   MD3: 4v1, 2v3
-const FIXTURE_PATTERN = [
-  { md: 1, home: 1, away: 2 },
-  { md: 1, home: 3, away: 4 },
-  { md: 2, home: 1, away: 3 },
-  { md: 2, home: 4, away: 2 },
-  { md: 3, home: 4, away: 1 },
-  { md: 3, home: 2, away: 3 },
+// ── The official schedule: [ET date, ET time, home, away, venue] ────────────
+// Source: ESPN official 2026 World Cup fixtures (all 72 group matches).
+const FIXTURES = [
+  ["2026-06-11", "3 p.m.", "Mexico", "South Africa", "Mexico City"],
+  ["2026-06-11", "10 p.m.", "South Korea", "Czechia", "Zapopan"],
+  ["2026-06-12", "3 p.m.", "Canada", "Bosnia and Herzegovina", "Toronto"],
+  ["2026-06-12", "9 p.m.", "United States", "Paraguay", "Inglewood"],
+  ["2026-06-13", "3 p.m.", "Qatar", "Switzerland", "Santa Clara"],
+  ["2026-06-13", "6 p.m.", "Brazil", "Morocco", "East Rutherford"],
+  ["2026-06-13", "9 p.m.", "Haiti", "Scotland", "Foxborough"],
+  ["2026-06-14", "12 a.m.", "Australia", "Türkiye", "Vancouver"],
+  ["2026-06-14", "1 p.m.", "Germany", "Curaçao", "Houston"],
+  ["2026-06-14", "4 p.m.", "Netherlands", "Japan", "Arlington"],
+  ["2026-06-14", "7 p.m.", "Ivory Coast", "Ecuador", "Philadelphia"],
+  ["2026-06-14", "10 p.m.", "Sweden", "Tunisia", "Guadalupe"],
+  ["2026-06-15", "1 p.m.", "Spain", "Cape Verde", "Atlanta"],
+  ["2026-06-15", "6 p.m.", "Belgium", "Egypt", "Seattle"],
+  ["2026-06-15", "6 p.m.", "Saudi Arabia", "Uruguay", "Miami Gardens"],
+  ["2026-06-16", "12 a.m.", "Iran", "New Zealand", "Inglewood"],
+  ["2026-06-16", "3 p.m.", "France", "Senegal", "East Rutherford"],
+  ["2026-06-16", "6 p.m.", "Iraq", "Norway", "Foxborough"],
+  ["2026-06-16", "9 p.m.", "Argentina", "Algeria", "Kansas City"],
+  ["2026-06-17", "12 a.m.", "Austria", "Jordan", "Santa Clara"],
+  ["2026-06-17", "1 p.m.", "Portugal", "DR Congo", "Houston"],
+  ["2026-06-17", "4 p.m.", "England", "Croatia", "Arlington"],
+  ["2026-06-17", "7 p.m.", "Ghana", "Panama", "Toronto"],
+  ["2026-06-17", "10 p.m.", "Uzbekistan", "Colombia", "Mexico City"],
+  ["2026-06-18", "12 p.m.", "Czechia", "South Africa", "Atlanta"],
+  ["2026-06-18", "3 p.m.", "Switzerland", "Bosnia and Herzegovina", "Inglewood"],
+  ["2026-06-18", "6 p.m.", "Canada", "Qatar", "Vancouver"],
+  ["2026-06-18", "11 p.m.", "Mexico", "South Korea", "Zapopan"],
+  ["2026-06-19", "3 p.m.", "United States", "Australia", "Seattle"],
+  ["2026-06-19", "6 p.m.", "Scotland", "Morocco", "Foxborough"],
+  ["2026-06-19", "9 p.m.", "Brazil", "Haiti", "Philadelphia"],
+  ["2026-06-20", "12 a.m.", "Türkiye", "Paraguay", "Santa Clara"],
+  ["2026-06-20", "1 p.m.", "Netherlands", "Sweden", "Houston"],
+  ["2026-06-20", "4 p.m.", "Germany", "Ivory Coast", "Toronto"],
+  ["2026-06-20", "8 p.m.", "Ecuador", "Curaçao", "Kansas City"],
+  ["2026-06-21", "12 a.m.", "Tunisia", "Japan", "Guadalupe"],
+  ["2026-06-21", "12 p.m.", "Spain", "Saudi Arabia", "Atlanta"],
+  ["2026-06-21", "3 p.m.", "Belgium", "Iran", "Inglewood"],
+  ["2026-06-21", "6 p.m.", "Uruguay", "Cape Verde", "Miami Gardens"],
+  ["2026-06-21", "9 p.m.", "New Zealand", "Egypt", "Vancouver"],
+  ["2026-06-22", "1 p.m.", "Argentina", "Austria", "Arlington"],
+  ["2026-06-22", "5 p.m.", "France", "Iraq", "Philadelphia"],
+  ["2026-06-22", "8 p.m.", "Norway", "Senegal", "East Rutherford"],
+  ["2026-06-22", "11 p.m.", "Jordan", "Algeria", "Santa Clara"],
+  ["2026-06-23", "1 p.m.", "Portugal", "Uzbekistan", "Houston"],
+  ["2026-06-23", "4 p.m.", "England", "Ghana", "Foxborough"],
+  ["2026-06-23", "7 p.m.", "Panama", "Croatia", "Toronto"],
+  ["2026-06-23", "10 p.m.", "Colombia", "DR Congo", "Zapopan"],
+  ["2026-06-24", "3 p.m.", "Switzerland", "Canada", "Vancouver"],
+  ["2026-06-24", "3 p.m.", "Bosnia and Herzegovina", "Qatar", "Seattle"],
+  ["2026-06-24", "6 p.m.", "Scotland", "Brazil", "Miami Gardens"],
+  ["2026-06-24", "6 p.m.", "Morocco", "Haiti", "Atlanta"],
+  ["2026-06-24", "9 p.m.", "Czechia", "Mexico", "Mexico City"],
+  ["2026-06-24", "9 p.m.", "South Africa", "South Korea", "Guadalupe"],
+  ["2026-06-25", "4 p.m.", "Ecuador", "Germany", "East Rutherford"],
+  ["2026-06-25", "4 p.m.", "Curaçao", "Ivory Coast", "Philadelphia"],
+  ["2026-06-25", "7 p.m.", "Japan", "Sweden", "Arlington"],
+  ["2026-06-25", "7 p.m.", "Tunisia", "Netherlands", "Kansas City"],
+  ["2026-06-25", "10 p.m.", "Türkiye", "United States", "Inglewood"],
+  ["2026-06-25", "10 p.m.", "Paraguay", "Australia", "Santa Clara"],
+  ["2026-06-26", "3 p.m.", "Norway", "France", "Foxborough"],
+  ["2026-06-26", "3 p.m.", "Senegal", "Iraq", "Toronto"],
+  ["2026-06-26", "8 p.m.", "Cape Verde", "Saudi Arabia", "Houston"],
+  ["2026-06-26", "8 p.m.", "Uruguay", "Spain", "Zapopan"],
+  ["2026-06-26", "11 p.m.", "Egypt", "Iran", "Seattle"],
+  ["2026-06-26", "11 p.m.", "New Zealand", "Belgium", "Vancouver"],
+  ["2026-06-27", "5 p.m.", "Panama", "England", "East Rutherford"],
+  ["2026-06-27", "5 p.m.", "Croatia", "Ghana", "Philadelphia"],
+  ["2026-06-27", "7:30 p.m.", "Colombia", "Portugal", "Miami Gardens"],
+  ["2026-06-27", "7:30 p.m.", "DR Congo", "Uzbekistan", "Atlanta"],
+  ["2026-06-27", "10 p.m.", "Algeria", "Austria", "Kansas City"],
+  ["2026-06-27", "10 p.m.", "Jordan", "Argentina", "Arlington"],
 ];
 
-// Group-stage matchday date windows (local GMT-6 dates), 11–27 Jun 2026.
-// Each group gets one date per matchday, staggered across groups so the
-// schedule fills the window (4 kickoff slots/day in GMT-6).
-const MATCHDAY_DATES = {
-  // groups A–L → [MD1 date, MD2 date, MD3 date]
-  A: ["2026-06-11", "2026-06-18", "2026-06-24"],
-  B: ["2026-06-12", "2026-06-18", "2026-06-24"],
-  C: ["2026-06-13", "2026-06-19", "2026-06-25"],
-  D: ["2026-06-12", "2026-06-19", "2026-06-25"],
-  E: ["2026-06-13", "2026-06-20", "2026-06-26"],
-  F: ["2026-06-14", "2026-06-20", "2026-06-26"],
-  G: ["2026-06-14", "2026-06-21", "2026-06-26"],
-  H: ["2026-06-15", "2026-06-21", "2026-06-25"],
-  I: ["2026-06-15", "2026-06-22", "2026-06-24"],
-  J: ["2026-06-16", "2026-06-22", "2026-06-25"],
-  K: ["2026-06-16", "2026-06-23", "2026-06-27"],
-  L: ["2026-06-17", "2026-06-23", "2026-06-27"],
-};
-
-// Kickoff time slots (local GMT-6). The two matches on a group's matchday get
-// two of these; we alternate so a group's games don't always clash.
-const SLOTS = ["10:00", "13:00", "16:00", "19:00"];
-
 function buildMatches() {
-  const rows = [];
-  const groupLetters = Object.keys(GROUPS);
-
-  for (const g of groupLetters) {
-    const teams = GROUPS[g];
-    const dates = MATCHDAY_DATES[g];
-    // Track how many matches placed per matchday for this group to pick a slot.
-    const perMdCount = { 1: 0, 2: 0, 3: 0 };
-
-    for (const fx of FIXTURE_PATTERN) {
-      const date = dates[fx.md - 1];
-      // two matches per matchday → slots offset by group index for variety
-      const slotBase = (groupLetters.indexOf(g) + perMdCount[fx.md]) % SLOTS.length;
-      const time = SLOTS[slotBase];
-      perMdCount[fx.md] += 1;
-
-      rows.push({
-        external_id: `WC2026-${g}-MD${fx.md}-${fx.home}v${fx.away}`,
-        home_team: teams[fx.home - 1],
-        away_team: teams[fx.away - 1],
-        kickoff_at: localToUtcISO(date, time),
-        stage: `Group ${g}`,
-        home_score: null,
-        away_score: null,
-        status: "scheduled",
-      });
-    }
-  }
-
-  // Sort chronologically for nice output.
-  rows.sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
-  return rows;
+  return FIXTURES.map(([date, etTime, home, away, venue]) => {
+    const group = GROUP_OF[home] ?? GROUP_OF[away];
+    if (!group) throw new Error(`No group for ${home} / ${away}`);
+    return {
+      external_id: `WC2026-${date}-${home}-v-${away}`.replace(/\s+/g, "_"),
+      home_team: home,
+      away_team: away,
+      kickoff_at: etToUtcISO(date, etTime),
+      // Stage carries the group + venue so the card shows context.
+      stage: `Group ${group} · ${venue}`,
+      home_score: null,
+      away_score: null,
+      status: "scheduled",
+    };
+  }).sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at));
 }
 
 async function main() {
@@ -165,7 +204,7 @@ async function main() {
         timeStyle: "short",
       });
       console.log(
-        `${m.stage.padEnd(8)} ${local.padEnd(24)} (GMT-6)  ${m.home_team} vs ${m.away_team}`,
+        `${local.padEnd(25)} (GMT-6)  ${m.home_team} vs ${m.away_team}  [${m.stage}]`,
       );
     }
     console.log("\n--dry: no database changes made.");
@@ -176,7 +215,6 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // 1) Clear predictions first (FK), then matches.
   console.log("Clearing existing predictions…");
   const delPred = await supabase
     .from("predictions")
@@ -188,7 +226,6 @@ async function main() {
   const delMatch = await supabase.from("matches").delete().not("id", "is", null);
   if (delMatch.error) throw delMatch.error;
 
-  // 2) Insert the new fixtures.
   console.log(`Inserting ${matches.length} matches…`);
   const { error: insErr, count } = await supabase
     .from("matches")
@@ -197,7 +234,7 @@ async function main() {
 
   console.log(`✓ Seeded ${count ?? matches.length} World Cup 2026 group matches.`);
   console.log(
-    "Kickoff times stored as UTC (timestamptz); they render in each viewer's local time.",
+    "Official ET kickoffs stored as UTC; they render in each viewer's local time (GMT-6 for you).",
   );
 }
 
