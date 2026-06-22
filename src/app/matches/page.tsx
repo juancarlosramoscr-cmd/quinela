@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { groupMatches } from "@/lib/predictions/group";
 import type { MatchWithPrediction } from "@/lib/predictions/types";
 import type { Match, Prediction } from "@/lib/database.types";
-import MatchPredictionCard from "@/components/MatchPredictionCard";
+import MatchesList from "@/components/MatchesList";
 
 export const metadata = {
   title: "Matches — Quinela",
@@ -64,32 +64,7 @@ export default async function MatchesPage() {
         </p>
       </header>
 
-      {groups.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-          No matches scheduled yet. Check back soon.
-        </p>
-      ) : (
-        <div className="space-y-8">
-          {groups.map((group) => (
-            <section key={group.key}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                {group.label}
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {group.items.map(({ match, prediction }) => (
-                  <MatchPredictionCard
-                    key={match.id}
-                    match={match}
-                    prediction={prediction}
-                    userId={user.id}
-                    isAdmin={isAdmin}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+      <MatchesList groups={groups} userId={user.id} isAdmin={isAdmin} />
     </div>
   );
 }
