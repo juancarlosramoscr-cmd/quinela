@@ -3,7 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/database.types";
 
-/** Routes that require an authenticated session. */
+/**
+ * Routes that require an authenticated session.
+ *
+ * Note: /login, /forgot-password and /reset-password are intentionally absent —
+ * they must stay reachable without a (normal) session. /reset-password in
+ * particular runs on a Supabase recovery session that the browser client
+ * establishes from the email link's URL hash, which the server never sees.
+ */
 const PROTECTED_PREFIXES = [
   "/matches",
   "/leaderboard",

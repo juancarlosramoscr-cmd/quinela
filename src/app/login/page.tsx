@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 import { signIn, signUp, type AuthActionState } from "@/app/actions/auth";
 
@@ -69,12 +70,22 @@ function LoginForm() {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="mb-1 block text-sm font-medium text-slate-700"
-          >
-            Password
-          </label>
+          <div className="mb-1 flex items-center justify-between">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Password
+            </label>
+            {mode === "signin" && (
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-slate-600 underline underline-offset-2 hover:text-slate-900"
+              >
+                Forgot password?
+              </Link>
+            )}
+          </div>
           <input
             id="password"
             name="password"
