@@ -71,6 +71,68 @@ export async function createMatch(
 }
 
 /**
+ * Rename the home/away teams of a match. Admin-only.
+ *
+ * Useful for fixing typos or replacing placeholder names (e.g. "Winner Group A")
+ * once a fixture is confirmed. Editing only the team names does not touch scores
+ * or status, so existing predictions stay valid. Refuses finished matches to
+ * keep the historical record intact.
+ *
+ * Same authorization model as createMatch: requireAdmin() gates the call, then
+ * the write uses the service-role client (avoids the matches RLS is_admin()
+ * EXECUTE-grant gap).
+ */
+export async function updateMatchTeams(
+  _prev: AdminActionResult | null,
+  formData: FormData,
+): Promise<AdminActionResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    return {
+      ok: false,
+      error: guard.status === 401 ? "Not signed in." : "Admins only.",
+    };
+  }
+
+  const matchId = String(formData.get("match_id") ?? "").trim();
+  const homeTeam = String(formData.get("home_team") ?? "").trim();
+  const awayTeam = String(formData.get("away_team") ?? "").trim();
+
+  if (!matchId) return { ok: false, error: "Missing match id." };
+  if (!homeTeam || !awayTeam) {
+    return { ok: false, error: "Home and away teams are required." };
+  }
+
+  const supabase = createAdminClient();
+
+  // Guard against editing a finished match (its result is part of the record).
+  const { data: match, error: fetchError } = await supabase
+    .from("matches")
+    .select("status")
+    .eq("id", matchId)
+    .single();
+
+  if (fetchError) return { ok: false, error: fetchError.message };
+  if (!match) return { ok: false, error: "Match not found." };
+  if (match.status === "finished") {
+    return { ok: false, error: "Can't rename teams on a finished match." };
+  }
+
+  const { error } = await supabase
+    .from("matches")
+    .update({ home_team: homeTeam, away_team: awayTeam })
+    .eq("id", matchId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/matches");
+  return { ok: true };
+}
+
+/**
  * Finalize a match result. Sets home/away score and status='finished', which
  * fires the DB `score_match_predictions` trigger to award points.
  *
