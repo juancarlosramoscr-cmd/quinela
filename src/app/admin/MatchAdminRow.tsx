@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 
 import { finalizeMatch, type AdminActionResult } from "@/app/actions/admin";
@@ -36,6 +37,17 @@ export default function MatchAdminRow({ match }: { match: Match }) {
   );
   const isFinished = match.status === "finished";
 
+  // Track the entered scores so the penalty-winner selector only appears on a
+  // level score (a penalty result is still a draw — see CLAUDE.md). The server
+  // independently ignores the tag unless the score is level.
+  const [home, setHome] = useState<string>(
+    match.home_score?.toString() ?? "",
+  );
+  const [away, setAway] = useState<string>(
+    match.away_score?.toString() ?? "",
+  );
+  const isDraw = home !== "" && away !== "" && home === away;
+
   return (
     <li className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -65,6 +77,13 @@ export default function MatchAdminRow({ match }: { match: Match }) {
             ? `Finished ${match.home_score}–${match.away_score}`
             : "Scheduled"}
         </span>
+        {isFinished && match.penalty_winner && (
+          <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+            {(match.penalty_winner === "home"
+              ? match.home_team
+              : match.away_team) + " won on penalties"}
+          </span>
+        )}
       </div>
 
       <form
@@ -81,7 +100,8 @@ export default function MatchAdminRow({ match }: { match: Match }) {
             type="number"
             min={0}
             required
-            defaultValue={match.home_score ?? ""}
+            value={home}
+            onChange={(e) => setHome(e.target.value)}
             className="w-20 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
         </label>
@@ -94,9 +114,29 @@ export default function MatchAdminRow({ match }: { match: Match }) {
             type="number"
             min={0}
             required
-            defaultValue={match.away_score ?? ""}
+            value={away}
+            onChange={(e) => setAway(e.target.value)}
             className="w-20 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
+        </label>
+        {/* Penalty winner only applies to a level score. The field is always
+            present in the DOM (defaulting to "" = no shootout) but is disabled
+            and visually hidden unless the entered scores are equal; the server
+            ignores it for non-draws regardless. */}
+        <label className={`text-xs ${isDraw ? "" : "hidden"}`}>
+          <span className="mb-1 block font-medium text-slate-600">
+            Won on penalties
+          </span>
+          <select
+            name="penalty_winner"
+            disabled={!isDraw}
+            defaultValue={match.penalty_winner ?? ""}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          >
+            <option value="">— no shootout (true draw)</option>
+            <option value="home">{match.home_team}</option>
+            <option value="away">{match.away_team}</option>
+          </select>
         </label>
         <SaveButton finished={isFinished} />
         {state?.ok && (

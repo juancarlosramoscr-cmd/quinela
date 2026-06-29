@@ -93,6 +93,7 @@ export async function finalizeMatch(
   const matchId = String(formData.get("match_id") ?? "").trim();
   const homeRaw = String(formData.get("home_score") ?? "").trim();
   const awayRaw = String(formData.get("away_score") ?? "").trim();
+  const penaltyRaw = String(formData.get("penalty_winner") ?? "").trim();
 
   if (!matchId) return { ok: false, error: "Missing match id." };
 
@@ -109,6 +110,16 @@ export async function finalizeMatch(
     return { ok: false, error: "Scores must be non-negative whole numbers." };
   }
 
+  // A penalty winner only makes sense on a level full-time score (the regulation
+  // result is still a draw for scoring). Persist the tag only then; otherwise
+  // force null so correcting a result away from a draw can't leave a stale tag.
+  // The DB CHECK constraint also guards the allowed values.
+  const isDraw = homeScore === awayScore;
+  const penaltyWinner =
+    isDraw && (penaltyRaw === "home" || penaltyRaw === "away")
+      ? penaltyRaw
+      : null;
+
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("matches")
@@ -116,6 +127,7 @@ export async function finalizeMatch(
       home_score: homeScore,
       away_score: awayScore,
       status: "finished",
+      penalty_winner: penaltyWinner,
     })
     .eq("id", matchId);
 
