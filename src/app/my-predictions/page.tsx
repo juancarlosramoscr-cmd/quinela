@@ -118,6 +118,14 @@ export default async function MyPredictionsPage() {
                       {finished && m.home_score !== null && m.away_score !== null
                         ? `${m.home_score} – ${m.away_score}`
                         : "—"}
+                      {finished && m.penalty_winner && (
+                        <div className="mt-0.5 text-xs font-medium text-indigo-700">
+                          {m.penalty_winner === "home"
+                            ? m.home_team
+                            : m.away_team}{" "}
+                          won on pens
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <PointsBadge points={r.points} finished={finished} />
