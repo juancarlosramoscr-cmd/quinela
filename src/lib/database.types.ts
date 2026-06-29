@@ -5,6 +5,9 @@
 
 export type MatchStatus = "scheduled" | "finished";
 
+/** Which side won a penalty shootout. Display-only tag; does not affect scoring. */
+export type PenaltyWinner = "home" | "away";
+
 export interface Database {
   public: {
     Tables: {
@@ -40,6 +43,9 @@ export interface Database {
           home_score: number | null;
           away_score: number | null;
           status: MatchStatus;
+          /** Penalty-shootout winner tag ('home'|'away') or null. Display-only;
+           *  does not affect scoring — a level full-time score is still a draw. */
+          penalty_winner: PenaltyWinner | null;
           created_at: string;
         };
         Insert: {
@@ -52,6 +58,7 @@ export interface Database {
           home_score?: number | null;
           away_score?: number | null;
           status?: MatchStatus;
+          penalty_winner?: PenaltyWinner | null;
           created_at?: string;
         };
         Update: {
@@ -64,6 +71,7 @@ export interface Database {
           home_score?: number | null;
           away_score?: number | null;
           status?: MatchStatus;
+          penalty_winner?: PenaltyWinner | null;
           created_at?: string;
         };
         Relationships: [];

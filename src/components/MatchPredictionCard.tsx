@@ -179,8 +179,20 @@ export default function MatchPredictionCard({
       {isFinished &&
         match.home_score !== null &&
         match.away_score !== null && (
-          <div className="mt-2 text-center text-sm font-bold text-slate-900">
-            Full time {match.home_score} – {match.away_score}
+          <div className="mt-2 text-center">
+            <div className="text-sm font-bold text-slate-900">
+              Full time {match.home_score} – {match.away_score}
+            </div>
+            {/* Penalty-shootout winner tag. The score above is still a draw for
+                points (3 for exact, 1 for outcome); this only marks who advanced. */}
+            {match.penalty_winner && (
+              <div className="mt-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                {match.penalty_winner === "home"
+                  ? match.home_team
+                  : match.away_team}{" "}
+                won on penalties
+              </div>
+            )}
           </div>
         )}
 
