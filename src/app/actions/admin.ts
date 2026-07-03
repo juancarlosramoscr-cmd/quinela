@@ -11,6 +11,36 @@ export interface AdminActionResult {
 }
 
 /**
+ * Resolve a naive `datetime-local` string (e.g. "2026-07-10T18:00", no zone)
+ * into an absolute instant using the admin browser's UTC offset in minutes
+ * (Date.getTimezoneOffset semantics: positive when local is behind UTC).
+ *
+ * The wall-clock components are read directly from the string (not via
+ * `new Date(naive)`, which would re-interpret them in the *server's* zone), then
+ * shifted by the offset to get true UTC. If the offset is absent or malformed,
+ * we fall back to server-local parsing so a JS-disabled or non-browser submit
+ * still produces a value (matching the previous behaviour).
+ */
+function resolveKickoff(naive: string, offsetRaw: string): Date | null {
+  const m = naive.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  const offset = Number(offsetRaw);
+  if (!m || offsetRaw === "" || !Number.isFinite(offset)) {
+    // No usable offset — fall back to interpreting in the server's zone.
+    const fallback = new Date(naive);
+    return Number.isNaN(fallback.getTime()) ? null : fallback;
+  }
+  const [, y, mo, d, h, mi, s] = m;
+  // Date.UTC treats the components as UTC; adding the offset (local-behind-UTC
+  // is positive) converts the admin's wall clock to the correct instant.
+  const utcMs =
+    Date.UTC(+y, +mo - 1, +d, +h, +mi, s ? +s : 0) + offset * 60_000;
+  const date = new Date(utcMs);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
  * Create a new match (fixture). Admin-only.
  *
  * Authorization is enforced HERE by requireAdmin() (which reads
@@ -37,6 +67,7 @@ export async function createMatch(
   const homeTeam = String(formData.get("home_team") ?? "").trim();
   const awayTeam = String(formData.get("away_team") ?? "").trim();
   const kickoffLocal = String(formData.get("kickoff_at") ?? "").trim();
+  const offsetRaw = String(formData.get("kickoff_offset_minutes") ?? "").trim();
   const stage = String(formData.get("stage") ?? "").trim();
 
   if (!homeTeam || !awayTeam) {
@@ -46,9 +77,13 @@ export async function createMatch(
     return { ok: false, error: "Kickoff time is required." };
   }
 
-  // datetime-local has no timezone; interpret in the server's locale and store ISO.
-  const kickoffDate = new Date(kickoffLocal);
-  if (Number.isNaN(kickoffDate.getTime())) {
+  // datetime-local has no timezone. The client stamps the admin's browser UTC
+  // offset (Date.getTimezoneOffset semantics: minutes, positive when local is
+  // behind UTC) for the entered datetime, so we resolve the instant against the
+  // admin's clock instead of the server's. Fall back to server-local parsing
+  // only if the offset is missing (e.g. JS disabled / non-browser submit).
+  const kickoffDate = resolveKickoff(kickoffLocal, offsetRaw);
+  if (!kickoffDate || Number.isNaN(kickoffDate.getTime())) {
     return { ok: false, error: "Invalid kickoff time." };
   }
 
