@@ -5,6 +5,19 @@ import { useFormState, useFormStatus } from "react-dom";
 
 import { createMatch, type AdminActionResult } from "@/app/actions/admin";
 
+/**
+ * Compute the browser's UTC offset (in minutes, matching Date.getTimezoneOffset:
+ * positive when local is behind UTC) for the specific wall-clock datetime the
+ * admin typed. We evaluate the offset *for that date* rather than "now" so a
+ * kickoff on the other side of a DST boundary still gets the right offset.
+ * Returns null if the input can't be parsed.
+ */
+function localOffsetMinutes(naiveDatetime: string): number | null {
+  const asLocal = new Date(naiveDatetime);
+  if (Number.isNaN(asLocal.getTime())) return null;
+  return asLocal.getTimezoneOffset();
+}
+
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
@@ -24,13 +37,39 @@ export default function CreateMatchForm() {
     null,
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const offsetRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (state?.ok) formRef.current?.reset();
   }, [state]);
 
+  // The datetime-local input carries no timezone; stamp the browser's UTC offset
+  // for the entered datetime into a hidden field just before submit, so the
+  // server resolves the instant against the admin's clock rather than its own.
+  const stampOffset = () => {
+    const kickoff = formRef.current?.elements.namedItem(
+      "kickoff_at",
+    ) as HTMLInputElement | null;
+    const offset =
+      kickoff?.value != null ? localOffsetMinutes(kickoff.value) : null;
+    if (offsetRef.current) {
+      offsetRef.current.value = offset != null ? String(offset) : "";
+    }
+  };
+
   return (
-    <form ref={formRef} action={formAction} className="space-y-4">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={stampOffset}
+      className="space-y-4"
+    >
+      <input
+        ref={offsetRef}
+        type="hidden"
+        name="kickoff_offset_minutes"
+        defaultValue=""
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-slate-700">
